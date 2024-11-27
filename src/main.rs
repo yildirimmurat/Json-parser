@@ -10,7 +10,7 @@ fn main() {
     let mut file: File = File::open(file_path).unwrap();
     
     let mut content: String = String::new();
-    file.read_to_string(&mut content);
+    let _ = file.read_to_string(&mut content);
 
     let mut parser = JsonParser::new(&content);
     match parser.parse() {

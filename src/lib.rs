@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, f32::consts::E};
 
 #[derive(Debug)]
 pub struct JsonParser {
@@ -32,7 +32,7 @@ impl JsonParser {
 
             // Check for the end of the object '}'
             if self.peek() == Some('}') {
-                if (expects_another_item) {
+                if expects_another_item {
                     return Err("Expected a new key value pair".to_string());
                 }
                 self.consume();
@@ -42,7 +42,7 @@ impl JsonParser {
             expects_another_item = false;
 
             // Parse key
-            let key = self.parse_string()?;
+            let key: String = self.parse_string()?;
             self.skip_whitespece();
 
             if self.peek() != Some(':') {
@@ -97,6 +97,8 @@ impl JsonParser {
             Some('"') => self.parse_string(),
             Some('0'..='9') => self.parse_integer(),
             Some('t') | Some('f') | Some('n') => self.parse_bool_or_null(),
+            Some('{') => self.parse_object(),
+            Some('[') => self.parse_array(),
             _ => Err("Unexpected character while parsing".to_string()),
         }
     }
@@ -140,7 +142,6 @@ impl JsonParser {
     }
 
     fn parse_bool_or_null(&mut self) -> Result<String, String> {
-        let mut result: String = String::new();
         let ch: Option<char> = self.peek();
 
         match ch {
@@ -166,5 +167,90 @@ impl JsonParser {
         }
 
         Err("Expected bool or null".to_string())
+    }
+
+    fn parse_object(&mut self) -> Result<String, String> {
+        let mut result: HashMap<String, String> = HashMap::new();
+
+        self.skip_whitespece();
+
+        // Expect the object starts with '{'
+        if self.peek() != Some('{') {
+            return Err("Expected '{' at the beginning of object".to_string());
+        }
+        self.consume();
+
+        let mut expects_another_item = false;  // To check if it's the first item and avoid trailing commas
+
+        loop {
+            self.skip_whitespece();
+
+            // Check for the end of the object '}'
+            if self.peek() == Some('}') {
+                if expects_another_item {
+                    return Err("Expected a new key value pair".to_string());
+                }
+                self.consume();
+                break;
+            }
+
+            expects_another_item = false;
+
+            // Parse key
+            let key: String = self.parse_string()?;
+            self.skip_whitespece();
+
+            if self.peek() != Some(':') {
+                return Err("Expected : after a key".to_string());
+            }
+            self.consume();
+
+            self.skip_whitespece();
+
+            // Parse value
+            let value: String = self.parse_value()?; // not only string but can also be integer, null, or boolean (true, false)
+            
+            result.insert(key, value);
+            self.skip_whitespece();
+
+            if self.peek() == Some(',') {
+                self.consume();
+                expects_another_item = true;
+                continue;
+            } else if self.peek() == Some('}') {
+                self.consume();
+                break;
+            } else {
+                return Err("Expected , or } at the end of key and values".to_string());
+            }
+        }
+
+        Ok(format!("{:?}", result))
+
+    }
+
+    fn parse_array(&mut self) -> Result<String, String> {
+        let mut result: Vec<String> = Vec::new();
+
+        self.consume(); // Consume '['
+        self.skip_whitespece();
+
+        loop {
+            if self.peek() == Some(']') {
+                self.consume();
+                break;
+            }
+
+            let value = self.parse_value()?;
+            result.push(value);
+            self.skip_whitespece();
+
+            if self.peek() == Some(',') {
+                self.consume();
+                continue;
+            }
+        }
+        
+        Ok(format!("{:?}", result))
     }
 }
