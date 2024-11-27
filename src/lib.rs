@@ -15,7 +15,7 @@ impl JsonParser {
     }
 
     pub fn parse(&mut self) -> Result<HashMap<String, String>, String> {
-        let mut result = HashMap::new();
+        let mut result: HashMap<String, String> = HashMap::new();
 
         self.skip_whitespece();
 
@@ -53,7 +53,7 @@ impl JsonParser {
             self.skip_whitespece();
 
             // Parse value
-            let value = self.parse_string()?;
+            let value: String = self.parse_value()?; // not only string but can also be integer, null, or boolean (true, false)
             
             result.insert(key, value);
             self.skip_whitespece();
@@ -91,6 +91,16 @@ impl JsonParser {
         self.position += self.input[self.position..].chars().next().unwrap().len_utf8();
     }
 
+    fn parse_value(&mut self) -> Result<String, String> {
+        let ch: Option<char> = self.peek();
+        match ch {
+            Some('"') => self.parse_string(),
+            Some('0'..='9') => self.parse_integer(),
+            Some('t') | Some('f') | Some('n') => self.parse_bool_or_null(),
+            _ => Err("Unexpected character while parsing".to_string()),
+        }
+    }
+
     fn parse_string(&mut self) -> Result<String, String> {
         if self.peek() != Some('"') {
             return Err("Expected \" to start a string".to_string());
@@ -108,5 +118,53 @@ impl JsonParser {
         }
 
         return Err("Expected \" to end a string".to_string());
+    }
+
+    fn parse_integer(&mut self) -> Result<String, String> {
+        let mut result: String = String::new();
+
+        while let Some(ch) = self.peek() {
+            if ch.is_digit(10) {
+                result.push(ch);
+                self.consume();
+            } else {
+                break;
+            }
+        }
+
+        if result.is_empty() {
+            return Err("Expected integer".to_string());
+        }
+
+        Ok(result)
+    }
+
+    fn parse_bool_or_null(&mut self) -> Result<String, String> {
+        let mut result: String = String::new();
+        let ch: Option<char> = self.peek();
+
+        match ch {
+            Some('t') => {
+                if self.input[self.position..].starts_with("true") {
+                    self.position += 4;
+                    return Ok("true".to_string());
+                }
+            },
+            Some('f') => {
+                if self.input[self.position..].starts_with("false") {
+                    self.position += 5;
+                    return Ok("false".to_string());
+                }
+            },
+            Some('n') => {
+                if self.input[self.position..].starts_with("null") {
+                    self.position += 4;
+                    return Ok("null".to_string());
+                }
+            },
+            _ => {}
+        }
+
+        Err("Expected bool or null".to_string())
     }
 }
